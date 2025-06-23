@@ -3,35 +3,38 @@ import requests
 import datetime
 import csv
 import json
-from time import sleep
 
 # --- CONFIG ---
 ZENDESK_DOMAIN = "gmtour.zendesk.com"
 EMAIL = "yannawut@gmtour.com"
 TOKEN = "5IKzpPptiDAOmcBztHTOKkUWeYJhp6tTyoh0KO5n"
 AUTH = (f"{EMAIL}/token", TOKEN)
-ARCHIVE_DIR = "./zendesk_archive"
-CREATED_BEFORE = "2019-08-31"
-
-# Filter: Closed tickets created on or before 2019-08-31
-SEARCH_URL = (
-    f"https://{ZENDESK_DOMAIN}/api/v2/search.json?"
-    f"query=type:ticket status:closed created<={CREATED_BEFORE}"
-)
+ARCHIVE_DIR = "./zendesk_archive_cursor"
+CUTOFF_DATE = datetime.datetime(2019, 8, 31, tzinfo=datetime.timezone.utc)
+START_TIME = 0  # From Unix epoch
 
 os.makedirs(ARCHIVE_DIR, exist_ok=True)
 
-def search_old_closed_tickets():
-    url = SEARCH_URL
+def search_tickets_cursor():
+    url = f"https://{ZENDESK_DOMAIN}/api/v2/incremental/tickets/cursor.json?start_time={START_TIME}"
     while url:
-        print(f"Searching: {url}")
+        print(f"📦 Fetching: {url}")
         resp = requests.get(url, auth=AUTH)
         data = resp.json()
-        for ticket in data.get("results", []):
-            print(f"🧾 Ticket ID: {ticket['id']}, Created: {ticket['created_at']}, Updated: {ticket['updated_at']}")
-            yield ticket
-        url = data.get("next_page")
-        sleep(1)
+
+        stop_fetching = False
+        for ticket in data.get("tickets", []):
+            created_at = datetime.datetime.fromisoformat(ticket["created_at"].replace("Z", "+00:00"))
+            if created_at > CUTOFF_DATE:
+                stop_fetching = True
+                break
+            if ticket.get("status") == "closed":
+                print(f"𒌛 Ticket ID: {ticket['id']}, Created: {ticket['created_at']}, Status: {ticket['status']}")
+                yield ticket
+
+        if stop_fetching or not data.get("after_url"):
+            break
+        url = data.get("after_url")
 
 def get_ticket_comments(ticket_id):
     url = f"https://{ZENDESK_DOMAIN}/api/v2/tickets/{ticket_id}/comments.json"
@@ -40,7 +43,7 @@ def get_ticket_comments(ticket_id):
 
 def download_attachment(att, save_path):
     file_url = att["content_url"]
-    print(f"📥 Downloading {att['file_name']}")
+    print(f"📅 Downloading {att['file_name']}")
     r = requests.get(file_url, auth=AUTH)
     with open(save_path, "wb") as f:
         f.write(r.content)
@@ -73,7 +76,7 @@ def export_summary_csv(tickets):
             writer.writerow(row)
 
 # --- MAIN FLOW ---
-all_tickets = list(search_old_closed_tickets())
+all_tickets = list(search_tickets_cursor())
 for ticket in all_tickets:
     archive_ticket(ticket)
 
