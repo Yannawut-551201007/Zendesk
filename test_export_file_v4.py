@@ -18,7 +18,7 @@ os.makedirs(ARCHIVE_DIR, exist_ok=True)
 def search_tickets_cursor():
     url = f"https://{ZENDESK_DOMAIN}/api/v2/incremental/tickets/cursor.json?start_time={START_TIME}"
     while url:
-        print(f"📦 Fetching: {url}")
+        print(f" Fetching: {url}")
         resp = requests.get(url, auth=AUTH)
         data = resp.json()
 
