@@ -13,7 +13,7 @@ AUTH = (f"{EMAIL}/token", TOKEN)
 ARCHIVE_DIR = "./zendesk_archive"
 CREATED_BEFORE = "2019-08-31"
 
-# 🎯 Filter: Closed tickets created on or before 2019-08-31
+# Filter: Closed tickets created on or before 2019-08-31
 SEARCH_URL = (
     f"https://{ZENDESK_DOMAIN}/api/v2/search.json?"
     f"query=type:ticket status:closed created<={CREATED_BEFORE}"
